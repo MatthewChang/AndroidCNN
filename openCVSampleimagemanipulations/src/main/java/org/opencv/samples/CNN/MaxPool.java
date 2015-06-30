@@ -1,9 +1,13 @@
 package org.opencv.samples.CNN;
 
+import android.util.Log;
+
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.core.Scalar;
 
 import java.util.ArrayList;
 
@@ -23,16 +27,17 @@ public class MaxPool implements Layer {
     }
     @Override
     public ArrayList<Mat> evaluate(ArrayList<Mat> in) {
-        ArrayList<Mat> ret = new ArrayList<Mat>();
+        Mat temp;
         for(int i = 0; i < in.size();i++) {
-            ret.add(new Mat());
+            double min = Core.minMaxLoc(in.get(i)).minVal;
+            temp = Mat.ones(in.get(i).rows() + 2 * pad, in.get(i).cols() + 2 * pad, in.get(i).type());
+            Core.multiply(temp,new Scalar(min),temp);
+            in.get(i).copyTo(temp.submat(pad, temp.rows() - pad, pad, temp.cols() - pad));
+            Imgproc.dilate(temp, temp, kernel);
+            temp = temp.submat(off,temp.rows()-off,off,temp.cols()-off);
+            Imgproc.resize(temp,in.get(i),new Size(0,0),1.0/stride,1.0/stride,Imgproc.INTER_NEAREST);
         }
-        for(int i = 0; i < in.size();i++) {
-            Imgproc.dilate(in.get(i),in.get(i),kernel);
-            Mat temp = in.get(i).submat(off,in.get(i).rows()-off,off,in.get(i).cols()-off);
-            Imgproc.resize(temp,ret.get(i),new Size(0,0),1.0/stride,1.0/stride,Imgproc.INTER_NEAREST);
-        }
-        return ret;
+        return in;
     }
 
     public String toString() {

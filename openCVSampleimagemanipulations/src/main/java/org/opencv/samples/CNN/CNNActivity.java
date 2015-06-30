@@ -218,7 +218,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         String s = "";
         for(int r = 0; r < A.rows();r++) {
             for(int c= 0; c < A.cols();c++) {
-                s += A.get(r,c)[0] + " ";
+                s += String.format("%.4f ",A.get(r,c)[0]);
             }
             s += "\n";
         }
@@ -381,12 +381,32 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Size sizeRgba = rgba.size();
         int width = 7;
 
+
         ArrayList<Mat> in = new ArrayList<Mat>();
         in.add(input);
-        ArrayList<Mat> out = net.layers.get(0).evaluate(in);
-        Log.i(TAG,MatToString(input));
-        Imgproc.filter2D(input,mIntermediateMat,CvType.CV_32F,filter);
-        Log.i(TAG,""+MatToString(out.get(9)));
+        in = net.evaluate(in);
+        Log.i(TAG, "4\n" + MatToString(in.get(0)));
+        Log.i(TAG, "4\n" + MatToString(in.get(1)));
+        Log.i(TAG, "4\n" + MatToString(in.get(2)));
+        /*int off = 2;
+        int stride = 4;
+        Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
+        int pad = 2;
+
+        double min = Core.minMaxLoc(in.get(0)).minVal;
+        Mat temp = Mat.ones(in.get(0).rows() + 2 * pad, in.get(0).cols() + 2 * pad, in.get(0).type());
+        Core.multiply(temp,new Scalar(min),temp);
+        in.get(0).copyTo(temp.submat(pad, temp.rows() - pad, pad, temp.cols() - pad));
+        Log.i(TAG, "" + MatToString(temp));
+        Imgproc.dilate(temp, temp, kernel);
+        Log.i(TAG, "" + MatToString(temp));
+        temp = temp.submat(off,temp.rows()-off,off,temp.cols()-off);
+        Log.i(TAG, "" + temp);
+        int size = (int)Math.ceil(1.0*temp.rows()/stride);
+        Imgproc.resize(temp,in.get(0),new Size(size,size),0,0,Imgproc.INTER_NEAREST);*/
+
+        Log.i(TAG,""+MatToString(in.get(0)));
+
         //mIntermediateMat = mIntermediateMat.submat(5,mIntermediateMat.rows()-5,5,mIntermediateMat.cols()-5);
         //Log.i(TAG,MatToString(mIntermediateMat));
 
