@@ -145,11 +145,11 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private void init() {
         net.addLayer(loadConv("layer1", 11,11, 1, 10));
         net.addLayer(loadMaxPool("layer2"));
-        net.addLayer(loadConv("layer3", 7,7, 10, 5));
-        net.addLayer(loadConv("layer4", 1,1, 5, 3));
-
+        net.addLayer(loadConv("layer3", 7, 7, 10, 5));
+        net.addLayer(loadConv("layer4", 1, 1, 5, 3));
+        net.setMean(loadMatFromFile("config", 1, 1));
         input = loadMatFromFile("input",38,38);
-        filter = loadMatFromFile("layer1s1s1",11,11);
+        //filter = loadMatFromFile("layer1s1s1",11,11);
         Log.i(TAG,""+net);
         initialized = true;
     }
@@ -379,15 +379,29 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Core.flip(rgba, rgba, 0);
 
         Size sizeRgba = rgba.size();
-        int width = 7;
+        int width = 38;
+        int thumbSize = width*4;
+        Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
+        Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
+        Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2Lab);
+        Mat dist = distanceFrom(mIntermediateMat,new Point2(width/2,width/2));
+        dist.copyTo(input);
+        dist.convertTo(dist, CvType.CV_8U);
+        Imgproc.cvtColor(dist, dist, Imgproc.COLOR_GRAY2RGBA);
+        Imgproc.resize(dist, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
 
 
         ArrayList<Mat> in = new ArrayList<Mat>();
+        Core.flip(input,input,1);
         in.add(input);
         in = net.evaluate(in);
-        Log.i(TAG, "4\n" + MatToString(in.get(0)));
-        Log.i(TAG, "4\n" + MatToString(in.get(1)));
-        Log.i(TAG, "4\n" + MatToString(in.get(2)));
+        Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0]);
+        if(toggle) {
+            toggle = !toggle;
+            Log.i("~~","WRITING");
+            File file = new File(Environment.getExternalStorageDirectory(), "data/test_input.data");
+            mat2csvFile(input, file);
+        }
         /*int off = 2;
         int stride = 4;
         Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
@@ -405,9 +419,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         int size = (int)Math.ceil(1.0*temp.rows()/stride);
         Imgproc.resize(temp,in.get(0),new Size(size,size),0,0,Imgproc.INTER_NEAREST);*/
 
-        Log.i(TAG,""+MatToString(in.get(0)));
-
-        //mIntermediateMat = mIntermediateMat.submat(5,mIntermediateMat.rows()-5,5,mIntermediateMat.cols()-5);
+                //mIntermediateMat = mIntermediateMat.submat(5,mIntermediateMat.rows()-5,5,mIntermediateMat.cols()-5);
         //Log.i(TAG,MatToString(mIntermediateMat));
 
 
