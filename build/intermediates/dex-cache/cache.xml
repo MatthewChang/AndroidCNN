@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items version="2" >
+
+    <item
+        jar="C:\Users\Matthew\Files\Work\MediaLab\CNNAndroid\openCVSampleimagemanipulations\build\intermediates\exploded-aar\CNNAndroid\openCVLibrary2411\unspecified\classes.jar"
+        jumboMode="false"
+        revision="21.1.2"
+        sha1="bacef9d8a4644adae85494b670cd4f218cd068a7">
+        <dex dex="C:\Users\Matthew\Files\Work\MediaLab\CNNAndroid\openCVSampleimagemanipulations\build\intermediates\pre-dexed\debug\classes-32677dfd8e032cdf80af3cbbe3cdb4e990cd320b.jar" />
+    </item>
+    <item
+        jar="C:\Users\Matthew\Files\Work\MediaLab\samples\image-manipulations\openCVSampleimagemanipulations\build\intermediates\exploded-aar\image-manipulations\openCVLibrary2411\unspecified\classes.jar"
+        jumboMode="false"
+        revision="21.1.2"
+        sha1="9921db6a7f7d86b053f2641a5e6749048e319d92">
+        <dex dex="C:\Users\Matthew\Files\Work\MediaLab\samples\image-manipulations\openCVSampleimagemanipulations\build\intermediates\pre-dexed\debug\classes-66cc2e60866228ff252b4e26a8c50c657f66e1dd.jar" />
+    </item>
+    <item
+        jar="C:\Users\Matthew\Files\Work\MediaLab\sobel\openCVSampleimagemanipulations\build\intermediates\exploded-aar\sobel\openCVLibrary2411\unspecified\classes.jar"
+        jumboMode="false"
+        revision="21.1.2"
+        sha1="700a98f327c085e227c0ddbc8bc118c2854d06c8">
+        <dex dex="C:\Users\Matthew\Files\Work\MediaLab\sobel\openCVSampleimagemanipulations\build\intermediates\pre-dexed\debug\classes-384f1c8e87093bc8192fdbde2f7fef6d5aa27dac.jar" />
+    </item>
+
+</items>
