@@ -49,6 +49,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Net net;
     private Mat input;
     private Mat filter;
+    private Boolean tracking = false;
+    private int buffer[] = {3,3,3,3,3,3,3,3,3,3};
+    private int buffer_pos = 0;
 
     private byte bg_color[] = {0,0,0,0};
     private byte open_color[] = {127,127,0,0};
@@ -117,7 +120,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.image_manipulations_activity_surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
-        center = new Point2(64,64);
+        center = new Point2(38/2,38/2);
         net = new Net();
         /*Mat A = new Mat(11,11,CvType.CV_32F);
         loadMatFromFile("layer1s1s1",11,11,A);
@@ -138,20 +141,41 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }
 
     private MaxPool loadMaxPool(String filename) {
-        Mat pool = loadMatFromFile("layer2",1,4);
+        Mat pool = loadMatFromFile(filename,1,4);
         return new MaxPool((int)pool.get(0,0)[0],(int)pool.get(0,2)[0],(int)pool.get(0,3)[0]);
     }
 
     private void init() {
-        net.addLayer(loadConv("layer1", 11,11, 1, 10));
-        net.addLayer(loadMaxPool("layer2"));
-        net.addLayer(loadConv("layer3", 7, 7, 10, 5));
-        net.addLayer(loadConv("layer4", 1, 1, 5, 3));
+        net.addLayer(loadConv("layer1", 11, 11, 1, 30));
+        net.addLayer(new Relu());
+        net.addLayer(loadMaxPool("layer3"));
+        net.addLayer(loadConv("layer4", 7, 7, 30, 30));
+        net.addLayer(new Relu());
+        net.addLayer(loadConv("layer6", 1, 1, 30, 3));
         net.setMean(loadMatFromFile("config", 1, 1));
-        input = loadMatFromFile("input",38,38);
+        input = new Mat();
+        //input = loadMatFromFile("input",38,38);
         //filter = loadMatFromFile("layer1s1s1",11,11);
         Log.i(TAG,""+net);
         initialized = true;
+    }
+
+    private void addBuffer(int type) {
+        buffer[buffer_pos++] = type;
+        buffer_pos = buffer_pos%buffer.length;
+    }
+
+    private int buffer_mode() {
+        int counts[] = {0,0,0,0};
+        for(int i = 0; i < buffer.length; i++) {
+            counts[buffer[i]]++;
+        }
+        int m = 0;
+        for(int i = 1; i < counts.length; i++) {
+            if(counts[i] > counts[m])
+                m = i;
+        }
+        return m;
     }
 
     public Mat loadMatFromFile(String name,int row, int col) {
@@ -198,7 +222,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         mIntermediateMat = new Mat();
         mIntermediateMat2 = new Mat();
         previousLAB = new Mat();
-        feedbackMat = Mat.zeros(128,128,CvType.CV_32F);
+        feedbackMat = Mat.zeros(38,38,CvType.CV_32F);
     }
 
     public void onCameraViewStopped() {
@@ -322,7 +346,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         A.get(0, 0, data);
         //Log.i(TAG,""+A.depth()+" "+A.step1());
         int mean[] = new int[A.channels()];
-        int cand[][] = {{-2, 0},
+        /*int cand[][] = {{-2, 0},
                 {-1, 1},
                 {0, 2},
                 {1, 1},
@@ -335,8 +359,8 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
                 {1, 0},
                 {0, -1},
                 {0, 1},
-                {0, 0}};
-        //int cand[][] = {{0, 0}};
+                {0, 0}};*/
+        int cand[][] = {{0, 0}};
 
         for (int l = 0; l < A.channels(); l++) {
             for (int i = 0; i < cand.length; i++) {
@@ -384,23 +408,43 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
         Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
         Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2Lab);
-        Mat dist = distanceFrom(mIntermediateMat,new Point2(width/2,width/2));
-        dist.copyTo(input);
-        dist.convertTo(dist, CvType.CV_8U);
-        Imgproc.cvtColor(dist, dist, Imgproc.COLOR_GRAY2RGBA);
-        Imgproc.resize(dist, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
+        ArrayList<Mat> ch = new ArrayList<Mat>();
+        Core.split(mIntermediateMat,ch);
+        ch.remove(0);
+        Mat dist_lab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
+        Core.merge(ch,mIntermediateMat);
+        Mat dist_ab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
+        Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, feedbackMat);
+        feedbackMat.copyTo(input);
+        feedbackMat.convertTo(feedbackMat, CvType.CV_8U);
+        Imgproc.cvtColor(feedbackMat, feedbackMat, Imgproc.COLOR_GRAY2RGBA);
+        Imgproc.resize(feedbackMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
 
 
         ArrayList<Mat> in = new ArrayList<Mat>();
-        Core.flip(input,input,1);
+        Core.flip(input, input, 1);
         in.add(input);
         in = net.evaluate(in);
-        Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0]);
+        //Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
+        int max_pos = 0;
+        for(int i = 1; i < in.size(); i++) {
+            if(in.get(i).get(0, 0)[0] > in.get(max_pos).get(0, 0)[0])
+                max_pos = i;
+        }
+        addBuffer(max_pos);
+
+        Point c = new Point();
+        c.x = rgba.rows()*center.y/width;
+        c.y = rgba.cols()*center.x/width;
+        Core.putText(rgba,""+max_pos,new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
+        Core.circle(rgba,c,10,new Scalar(0,255,0,0),10);
         if(toggle) {
             toggle = !toggle;
-            Log.i("~~","WRITING");
+            /*Log.i("~~","WRITING");
             File file = new File(Environment.getExternalStorageDirectory(), "data/test_input.data");
-            mat2csvFile(input, file);
+            mat2csvFile(input, file);*/
+            center.x = width/2;
+            center.y = width/2;
         }
         /*int off = 2;
         int stride = 4;
