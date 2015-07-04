@@ -50,7 +50,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Mat input;
     private Mat filter;
     private Boolean tracking = false;
-    private int buffer[] = {3,3,3,3,3,3,3,3,3,3};
+    private double buffer[][] = new double[5][];
     private int buffer_pos = 0;
 
     private byte bg_color[] = {0,0,0,0};
@@ -122,6 +122,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
 
         center = new Point2(38/2,38/2);
         net = new Net();
+        for(int i = 0; i < buffer.length; i++) {
+            buffer[i] = new double[3];
+        }
         /*Mat A = new Mat(11,11,CvType.CV_32F);
         loadMatFromFile("layer1s1s1",11,11,A);
         Log.i(TAG,MatToString(A));*/
@@ -160,22 +163,32 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         initialized = true;
     }
 
-    private void addBuffer(int type) {
-        buffer[buffer_pos++] = type;
+    private void addBuffer(double[] in) {
+        buffer[buffer_pos++] = in;
         buffer_pos = buffer_pos%buffer.length;
     }
 
-    private int buffer_mode() {
-        int counts[] = {0,0,0,0};
+    private double[] buffer_average() {
+        double counts[] = {0,0,0};
         for(int i = 0; i < buffer.length; i++) {
-            counts[buffer[i]]++;
+            for(int c = 0; c < counts.length; c++) {
+                counts[c] += buffer[i][c];
+            }
         }
-        int m = 0;
+        for(int c = 0; c < counts.length; c++) {
+            counts[c] /= buffer.length;
+        }
+        return counts;
+    }
+
+    private int buffer_label() {
+        double counts[] = buffer_average();
+        int max_pos = 0;
         for(int i = 1; i < counts.length; i++) {
-            if(counts[i] > counts[m])
-                m = i;
+            if(counts[i] > counts[max_pos])
+                max_pos = i;
         }
-        return m;
+        return max_pos;
     }
 
     public Mat loadMatFromFile(String name,int row, int col) {
@@ -427,17 +440,25 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         in = net.evaluate(in);
         //Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
         int max_pos = 0;
-        for(int i = 1; i < in.size(); i++) {
+        double exp_sum = 0;
+        for(int i = 0; i < in.size(); i++) {
+            exp_sum += Math.exp(in.get(i).get(0, 0)[0]);
             if(in.get(i).get(0, 0)[0] > in.get(max_pos).get(0, 0)[0])
                 max_pos = i;
         }
-        addBuffer(max_pos);
+        double vals[] = {0,0,0};
+        for(int i = 0; i < in.size(); i++) {
+            vals[i] = Math.exp(in.get(i).get(0, 0)[0])/exp_sum;
+        }
+        addBuffer(vals);
 
         Point c = new Point();
         c.x = rgba.rows()*center.y/width;
         c.y = rgba.cols()*center.x/width;
-        Core.putText(rgba,""+max_pos,new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
-        Core.circle(rgba,c,10,new Scalar(0,255,0,0),10);
+        double res[] = buffer_average();
+        String s = String.format("%.3f, %.3f, %.3f",res[0],res[1],res[2]);
+        Core.putText(rgba,""+buffer_label(),new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
+        Core.circle(rgba, c, 10, new Scalar(0,255,0,0),10);
         if(toggle) {
             toggle = !toggle;
             /*Log.i("~~","WRITING");
