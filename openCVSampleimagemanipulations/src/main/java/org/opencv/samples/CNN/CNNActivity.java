@@ -2,6 +2,7 @@ package org.opencv.samples.CNN;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.samples.imagemanipulations.R;
 
 import android.app.Activity;
+import android.content.res.AssetFileDescriptor;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -52,6 +55,8 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Boolean tracking = false;
     private double buffer[][] = new double[7][];
     private int buffer_pos = 0;
+    MediaPlayer mp;
+    private int current_state = 0;
 
     private byte bg_color[] = {0,0,0,0};
     private byte open_color[] = {127,127,0,0};
@@ -59,6 +64,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private byte gun_color[] = {0,0,127,0};
     private byte other_color[] = {127,0,0,0};
     private byte colors[][] = {bg_color,open_color,gun_color,closed_color,other_color};
+    private String label_sound_files[] = {"open.mp3","closed.mp3","gun.mp3","nohand.mp3"};
 
     private Point point_add(Point o,Point t) {
         return new Point(o.x+t.x,o.y+t.y);
@@ -125,6 +131,8 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         for(int i = 0; i < buffer.length; i++) {
             buffer[i] = new double[4];
         }
+
+        mp = new MediaPlayer();
         /*Mat A = new Mat(11,11,CvType.CV_32F);
         loadMatFromFile("layer1s1s1",11,11,A);
         Log.i(TAG,MatToString(A));*/
@@ -216,7 +224,27 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     public boolean onTouch(View v, MotionEvent event) {
         Log.i(TAG, "onTouch event");
         toggle = !toggle;
+
+        if(mp.isPlaying())
+        {
+            mp.stop();
+        }
         return false;
+    }
+
+    public void playFile(String filename) {
+        try {
+            mp.reset();
+            AssetFileDescriptor afd;
+            afd = getAssets().openFd(filename);
+            mp.setDataSource(afd.getFileDescriptor(),afd.getStartOffset(),afd.getLength());
+            mp.prepare();
+            mp.start();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -456,7 +484,12 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         c.x = rgba.rows()*center.y/width;
         c.y = rgba.cols()*center.x/width;
         double res[] = buffer_average();
-        String s = String.format("%.3f, %.3f, %.3f",res[0],res[1],res[2]);
+        String s = String.format("%.3f, %.3f, %.3f", res[0], res[1], res[2]);
+        int new_label = buffer_label();
+        if(new_label != current_state) {
+            playFile(label_sound_files[new_label]);
+            current_state = new_label;
+        }
         switch(buffer_label()) {
             case 0:
                 Core.putText(rgba,"Open",new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
