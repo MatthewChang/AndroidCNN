@@ -26,6 +26,9 @@ import org.opencv.samples.imagemanipulations.R;
 
 import android.app.Activity;
 import android.content.res.AssetFileDescriptor;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
@@ -34,7 +37,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 
-public class CNNActivity extends Activity implements CvCameraViewListener2, View.OnTouchListener{
+public class CNNActivity extends Activity implements CvCameraViewListener2, View.OnTouchListener, SensorEventListener{
     private static final String TAG = "OCVSample::Activity";
 
    private CameraBridgeViewBase mOpenCvCameraView;
@@ -53,7 +56,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Mat input;
     private Mat filter;
     private Boolean tracking = false;
-    private double buffer[][] = new double[7][];
+    private double buffer[][] = new double[9][];
     private int buffer_pos = 0;
     MediaPlayer mp;
     private int current_state = 0;
@@ -126,9 +129,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.image_manipulations_activity_surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
-        center = new Point2(38/2,38/2);
+        center = new Point2(38 / 2, 38 / 2);
         net = new Net();
-        for(int i = 0; i < buffer.length; i++) {
+        for (int i = 0; i < buffer.length; i++) {
             buffer[i] = new double[4];
         }
 
@@ -230,6 +233,16 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
             mp.stop();
         }
         return false;
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor s,int accuracy) {
+
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent s) {
+
     }
 
     public void playFile(String filename) {
