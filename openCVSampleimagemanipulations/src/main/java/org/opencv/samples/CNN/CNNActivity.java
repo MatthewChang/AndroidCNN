@@ -160,13 +160,13 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }
 
     private void init() {
-        net.addLayer(loadConv("layer1", 11, 11, 1, 30));
+        net.addLayer(loadConv("layer1", 11, 11, 3, 30));
         net.addLayer(new Relu());
         net.addLayer(loadMaxPool("layer3"));
         net.addLayer(loadConv("layer4", 7, 7, 30, 30));
         net.addLayer(new Relu());
         net.addLayer(loadConv("layer6", 1, 1, 30, 4));
-        net.setMean(loadMatFromFile("config", 1, 1));
+        net.setMean(loadMatFromFile("config", 1, 3));
         input = new Mat();
         //input = loadMatFromFile("input",38,38);
         //filter = loadMatFromFile("layer1s1s1",11,11);
@@ -461,24 +461,15 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         int thumbSize = width*4;
         Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
         Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
-        Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2Lab);
         ArrayList<Mat> ch = new ArrayList<Mat>();
-        Core.split(mIntermediateMat,ch);
-        ch.remove(0);
-        Mat dist_lab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
-        Core.merge(ch,mIntermediateMat);
-        Mat dist_ab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
-        Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, feedbackMat);
-        feedbackMat.copyTo(input);
-        feedbackMat.convertTo(feedbackMat, CvType.CV_8U);
-        Imgproc.cvtColor(feedbackMat, feedbackMat, Imgproc.COLOR_GRAY2RGBA);
-        Imgproc.resize(feedbackMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
-
+        Core.flip(mIntermediateMat,mIntermediateMat,1);
+        Imgproc.resize(mIntermediateMat, mIntermediateMat2, new Size(thumbSize, thumbSize));
+        mIntermediateMat2.convertTo(thumb,CvType.CV_8U);
+        Core.split(mIntermediateMat, ch);
+        ch.remove(3);
 
         ArrayList<Mat> in = new ArrayList<Mat>();
-        Core.flip(input, input, 1);
-        in.add(input);
-        in = net.evaluate(in);
+        in = net.evaluate(ch);
         //Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
         int max_pos = 0;
         double exp_sum = 0;
@@ -493,9 +484,6 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         }
         addBuffer(vals);
 
-        Point c = new Point();
-        c.x = rgba.rows()*center.y/width;
-        c.y = rgba.cols()*center.x/width;
         double res[] = buffer_average();
         String s = String.format("%.3f, %.3f, %.3f", res[0], res[1], res[2]);
         int new_label = buffer_label();
@@ -520,11 +508,13 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         }
         if(toggle) {
             toggle = !toggle;
-            /*Log.i("~~","WRITING");
-            File file = new File(Environment.getExternalStorageDirectory(), "data/test_input.data");
-            mat2csvFile(input, file);*/
-            center.x = width/2;
-            center.y = width/2;
+            Log.i("~~","WRITING");
+            File file = new File(Environment.getExternalStorageDirectory(), "data/RRR.data");
+            mat2csvFile(ch.get(0), file);
+            file = new File(Environment.getExternalStorageDirectory(), "data/GGG.data");
+            mat2csvFile(ch.get(1), file);
+            file = new File(Environment.getExternalStorageDirectory(), "data/BBB.data");
+            mat2csvFile(ch.get(2), file);
         }
         /*int off = 2;
         int stride = 4;

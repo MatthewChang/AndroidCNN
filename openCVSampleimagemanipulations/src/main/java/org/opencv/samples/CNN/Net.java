@@ -27,6 +27,10 @@ public class Net implements Layer {
     }
     public String toString() {
         String ret = "";
+        for(int i = 0; i < imageMean.cols();i++) {
+            ret+= imageMean.get(0,i)[0] + " ";
+        }
+        ret += "\n";
         for(int i = 0; i < layers.size(); i++) {
             ret += layers.get(i) + "\n";
         }
