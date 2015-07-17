@@ -56,7 +56,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Mat input;
     private Mat filter;
     private Boolean tracking = false;
-    private double buffer[][] = new double[9][];
+    private double buffer[][] = new double[12][];
     private int buffer_pos = 0;
     MediaPlayer mp;
     private int current_state = 0;
