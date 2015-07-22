@@ -160,7 +160,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }
 
     private void init() {
-        net.addLayer(loadConv("layer1", 11, 11, 3, 30));
+        net.addLayer(loadConv("layer1", 11, 11, 1, 30));
         net.addLayer(new Relu());
         net.addLayer(loadMaxPool("layer3"));
         net.addLayer(loadConv("layer4", 7, 7, 30, 30));
@@ -465,10 +465,31 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         }
         Mat rgba = inputFrame.rgba();
         Core.flip(rgba, rgba, 0);
-
         Size sizeRgba = rgba.size();
         int width = 38;
         int thumbSize = width*4;
+
+        Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
+        Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
+        Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2Lab);
+        Mat dist_lab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
+
+        ArrayList<Mat> ch = new ArrayList<Mat>();
+        Core.split(mIntermediateMat,ch);
+        ch.remove(0);
+        Core.merge(ch,mIntermediateMat);
+        Mat dist_ab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
+        Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, feedbackMat);
+        feedbackMat.copyTo(input);
+        feedbackMat.convertTo(feedbackMat, CvType.CV_8U);
+        Imgproc.cvtColor(feedbackMat, feedbackMat, Imgproc.COLOR_GRAY2RGBA);
+        Imgproc.resize(feedbackMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
+
+
+        /*ArrayList<Mat> in = new ArrayList<Mat>();
+        Core.flip(input, input, 1);
+        in.add(input);
+        in = net.evaluate(in);
         Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
         Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
         ArrayList<Mat> ch = new ArrayList<Mat>();
@@ -476,7 +497,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Imgproc.resize(mIntermediateMat, mIntermediateMat2, new Size(thumbSize, thumbSize));
         mIntermediateMat2.convertTo(thumb,CvType.CV_8U);
         Core.split(mIntermediateMat, ch);
-        ch.remove(3);
+        ch.remove(3);*/
 
         ArrayList<Mat> in = new ArrayList<Mat>();
         in = net.evaluate(ch);
