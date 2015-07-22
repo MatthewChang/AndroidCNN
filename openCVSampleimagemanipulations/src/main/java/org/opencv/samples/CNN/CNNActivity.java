@@ -192,7 +192,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         return counts;
     }
 
-    private int buffer_label() {
+    /*private int buffer_label() {
         double counts[] = buffer_average();
         int max_pos = 0;
         for(int i = 1; i < counts.length; i++) {
@@ -200,6 +200,16 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
                 max_pos = i;
         }
         return max_pos;
+    }*/
+
+    private int buffer_label() {
+        double counts[] = buffer_average();
+        for(int i = 0; i < counts.length; i++) {
+            if(counts[i] > 0.7) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public Mat loadMatFromFile(String name,int row, int col) {
@@ -485,9 +495,10 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         addBuffer(vals);
 
         double res[] = buffer_average();
-        String s = String.format("%.3f, %.3f, %.3f", res[0], res[1], res[2]);
+        String s = String.format("%.3f, %.3f, %.3f, %.3f", res[0], res[1], res[2], res[3]);
+        Core.putText(rgba,s,new Point(thumbSize,thumbSize+20),0,1,new Scalar(255,0,0,0),5);
         int new_label = buffer_label();
-        if(new_label != current_state) {
+        if(new_label != current_state && new_label >= 0) {
             playFile(label_sound_files[new_label]);
             current_state = new_label;
         }
@@ -503,6 +514,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
                 break;
             case 3:
                 Core.putText(rgba,"No Hand",new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
+                break;
+            case -1:
+                Core.putText(rgba,"Unsure...",new Point(thumbSize,thumbSize),0,2,new Scalar(255,0,0,0),5);
                 break;
 
         }
