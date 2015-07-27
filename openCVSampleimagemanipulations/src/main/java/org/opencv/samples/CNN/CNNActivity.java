@@ -141,7 +141,14 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Log.i(TAG,MatToString(A));*/
     }
 
-    private Conv loadConv(String namebase,int kr, int kc, int t, int f) {
+    private Conv loadConv(String namebase) {
+        ArrayList<ArrayList<Mat>> layer = loadMat4FromFile(namebase);
+        Mat biases = loadMat2FromFile(namebase + "b", 1, f);
+        return new Conv(layer,biases);
+    }
+
+
+    /*private Conv loadConv(String namebase,int kr, int kc, int t, int f) {
         ArrayList<ArrayList<Mat>> layer = new ArrayList<ArrayList<Mat>>();
         for(int l = 0; l < f; l++) {
             layer.add(new ArrayList<Mat>());
@@ -152,7 +159,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         }
         Mat biases = loadMatFromFile(namebase+"b",1,f);
         return new Conv(layer,biases);
-    }
+    }*/
 
     private MaxPool loadMaxPool(String filename) {
         Mat pool = loadMatFromFile(filename,1,4);
@@ -160,13 +167,13 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }
 
     private void init() {
-        net.addLayer(loadConv("layer1", 11, 11, 1, 30));
+        net.addLayer(loadConv("layer1"));
         net.addLayer(new Relu());
         net.addLayer(loadMaxPool("layer3"));
-        net.addLayer(loadConv("layer4", 7, 7, 30, 30));
+        net.addLayer(loadConv("layer4"));
         net.addLayer(new Relu());
-        net.addLayer(loadConv("layer6", 1, 1, 30, 4));
-        net.setMean(loadMatFromFile("config", 1, 3));
+        net.addLayer(loadConv("layer6"));
+        net.setMean(loadMat2FromFile("config"));
         input = new Mat();
         //input = loadMatFromFile("input",38,38);
         //filter = loadMatFromFile("layer1s1s1",11,11);
@@ -224,6 +231,51 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         }
         ret.put(0,0,data);
         return ret;
+    }
+
+    public Mat loadMat2FromFile(String name) {
+        int resID = getResources().getIdentifier(name, "raw", getPackageName());
+        InputStream is = getResources().openRawResource(resID);
+        Scanner scan = new Scanner(is).useDelimiter(",|\\n");
+        int rows = Integer.parseInt(scan.next());
+        int cols = Integer.parseInt(scan.next());
+
+        Mat res = new Mat(rows, cols, CvType.CV_32F);
+        float data[] = new float[rows * cols];
+        int el = 0;
+        while (scan.hasNext()) { //Column major order
+            data[el++] = Float.parseFloat(scan.next());
+        }
+        res.put(0, 0, data);
+
+        return res;
+    }
+
+    public ArrayList<ArrayList<Mat>> loadMat4FromFile(String name) {
+        int resID = getResources().getIdentifier(name, "raw", getPackageName());
+        InputStream is = getResources().openRawResource(resID);
+        Scanner scan = new Scanner(is).useDelimiter(",|\\n");
+        int num_dims = 4;
+        int rows = Integer.parseInt(scan.next());
+        int cols = Integer.parseInt(scan.next());
+        int d3 = Integer.parseInt(scan.next());
+        int filters = Integer.parseInt(scan.next());
+        ArrayList<ArrayList<Mat>> layer = new ArrayList<ArrayList<Mat>>();
+        for (int f = 0; f < filters; f++) {
+            ArrayList<Mat> filter = new ArrayList<Mat>();
+            for (int i = 0; i < d3; i++) {
+                Mat res = new Mat(rows, cols, CvType.CV_32F);
+                float data[] = new float[rows * cols];
+                int el = 0;
+                while (scan.hasNext()) { //Column major order
+                    data[el++] = Float.parseFloat(scan.next());
+                }
+                res.put(0, 0, data);
+                filter.add(res);
+            }
+            layer.add(filter);
+        }
+        return layer;
     }
 
     @Override
@@ -500,7 +552,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         ch.remove(3);*/
 
         ArrayList<Mat> in = new ArrayList<Mat>();
-        in = net.evaluate(ch);
+        Core.flip(input,input,1);
+        in.add(input);
+        in = net.evaluate(in);
         //Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
         int max_pos = 0;
         double exp_sum = 0;
