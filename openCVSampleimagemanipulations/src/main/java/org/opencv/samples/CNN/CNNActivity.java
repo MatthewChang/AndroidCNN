@@ -143,7 +143,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
 
     private Conv loadConv(String namebase) {
         ArrayList<ArrayList<Mat>> layer = loadMat4FromFile(namebase);
-        Mat biases = loadMat2FromFile(namebase + "b", 1, f);
+        Mat biases = loadMat2FromFile(namebase + "b");
         return new Conv(layer,biases);
     }
 
@@ -167,6 +167,8 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }
 
     private void init() {
+        Log.i("~~~",MatToString(loadMat2FromFile("input")));
+
         net.addLayer(loadConv("layer1"));
         net.addLayer(new Relu());
         net.addLayer(loadMaxPool("layer3"));
@@ -236,15 +238,20 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     public Mat loadMat2FromFile(String name) {
         int resID = getResources().getIdentifier(name, "raw", getPackageName());
         InputStream is = getResources().openRawResource(resID);
-        Scanner scan = new Scanner(is).useDelimiter(",|\\n");
+        Scanner scan = new Scanner(is).useDelimiter(",| |\\n");
         int rows = Integer.parseInt(scan.next());
         int cols = Integer.parseInt(scan.next());
-
+        Log.i("~~~name",""+rows+ " " + cols);
         Mat res = new Mat(rows, cols, CvType.CV_32F);
         float data[] = new float[rows * cols];
         int el = 0;
         while (scan.hasNext()) { //Column major order
-            data[el++] = Float.parseFloat(scan.next());
+            String s= scan.next();
+            Log.i("~~~name",""+s);
+            data[el++] = Float.parseFloat(s);
+        }
+        if(el != rows*cols) {
+            Log.e("~~~","Size Mismatch");
         }
         res.put(0, 0, data);
 
@@ -254,7 +261,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     public ArrayList<ArrayList<Mat>> loadMat4FromFile(String name) {
         int resID = getResources().getIdentifier(name, "raw", getPackageName());
         InputStream is = getResources().openRawResource(resID);
-        Scanner scan = new Scanner(is).useDelimiter(",|\\n");
+        Scanner scan = new Scanner(is).useDelimiter(",| |\\n");
         int num_dims = 4;
         int rows = Integer.parseInt(scan.next());
         int cols = Integer.parseInt(scan.next());
