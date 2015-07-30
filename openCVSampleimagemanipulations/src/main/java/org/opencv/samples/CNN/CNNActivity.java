@@ -38,7 +38,7 @@ import android.view.View;
 import android.view.WindowManager;
 
 public class CNNActivity extends Activity implements CvCameraViewListener2, View.OnTouchListener, SensorEventListener{
-    private static final String TAG = "OCVSample::Activity";
+    private static final String TAG = "~~~";
 
    private CameraBridgeViewBase mOpenCvCameraView;
 
@@ -53,7 +53,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     private Mat previousLAB;
     private Boolean initialized = false;
     private Net net;
-    private Mat input;
+    private ArrayList<Mat> input;
     private Mat filter;
     private Boolean tracking = false;
     private double buffer[][] = new double[12][];
@@ -141,9 +141,9 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Log.i(TAG,MatToString(A));*/
     }
 
-    private Conv loadConv(String namebase) {
-        ArrayList<ArrayList<Mat>> layer = loadMat4FromFile(namebase);
-        Mat biases = loadMat2FromFile(namebase + "b");
+    private Conv loadConv(String filters, String biases_name) {
+        ArrayList<ArrayList<Mat>> layer = loadMat4FromFile(filters);
+        Mat biases = loadMat2FromFile(biases_name);
         return new Conv(layer,biases);
     }
 
@@ -162,25 +162,43 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
     }*/
 
     private MaxPool loadMaxPool(String filename) {
-        Mat pool = loadMatFromFile(filename,1,4);
+        Mat pool = loadMat2FromFile(filename);
         return new MaxPool((int)pool.get(0,0)[0],(int)pool.get(0,2)[0],(int)pool.get(0,3)[0]);
     }
 
     private void init() {
-        Log.i("~~~",MatToString(loadMat2FromFile("input")));
-
-        net.addLayer(loadConv("layer1"));
-        net.addLayer(new Relu());
-        net.addLayer(loadMaxPool("layer3"));
-        net.addLayer(loadConv("layer4"));
-        net.addLayer(new Relu());
-        net.addLayer(loadConv("layer6"));
-        net.setMean(loadMat2FromFile("config"));
-        input = new Mat();
+        //Log.i("~~~",MatToString(loadMat2FromFile("input")));
+        net = loadNetwork();
+        input = loadMat3FromFile("input");
         //input = loadMatFromFile("input",38,38);
         //filter = loadMatFromFile("layer1s1s1",11,11);
-        Log.i(TAG,""+net);
+        Log.i("~~~",""+net);
         initialized = true;
+    }
+
+    private Net loadNetwork() {
+        int resID = getResources().getIdentifier("config", "raw", getPackageName());
+        InputStream is = getResources().openRawResource(resID);
+        Scanner config = new Scanner(is).useDelimiter(" |\\n");
+        Net net = new Net();
+        while(config.hasNext()) {
+            String type = config.next();
+            if(type.equals("mean")) {
+                Mat mean = loadMat2FromFile(config.next());
+                Log.i("~~~",""+mean);
+                net.setMean(mean);
+            } else if(type.equals("conv")) {
+                net.addLayer(loadConv(config.next(),config.next()));
+            } else if(type.equals("pool")) {
+                net.addLayer(loadMaxPool(config.next()));
+            } else if(type.equals("relu")) {
+                net.addLayer(new Relu());
+            } else {
+                Log.e("~~~","Invalid type: "+type);
+                return null;
+            }
+        }
+        return net;
     }
 
     private void addBuffer(double[] in) {
@@ -221,33 +239,24 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         return -1;
     }
 
-    public Mat loadMatFromFile(String name,int row, int col) {
-        int resID = getResources().getIdentifier(name, "raw", getPackageName());
-        InputStream is = getResources().openRawResource(resID);
-        Scanner scan = new Scanner(is).useDelimiter(",|\\n");
-        Mat ret = new Mat(row,col,CvType.CV_32F);
-        float data[] = new float[row*col];
-        int i = 0;
-        while(scan.hasNext()) {
-            data[i++] = Float.parseFloat(scan.next());
-        }
-        ret.put(0,0,data);
-        return ret;
-    }
-
     public Mat loadMat2FromFile(String name) {
         int resID = getResources().getIdentifier(name, "raw", getPackageName());
         InputStream is = getResources().openRawResource(resID);
         Scanner scan = new Scanner(is).useDelimiter(",| |\\n");
+        int dims = Integer.parseInt(scan.next());
+        if(dims != 2) {
+            Log.e("~~~","Dimention mismatch");
+            return null;
+        }
         int rows = Integer.parseInt(scan.next());
         int cols = Integer.parseInt(scan.next());
-        Log.i("~~~name",""+rows+ " " + cols);
+        //Log.i("~~~name",""+rows+ " " + cols);
         Mat res = new Mat(rows, cols, CvType.CV_32F);
         float data[] = new float[rows * cols];
         int el = 0;
         while (scan.hasNext()) { //Column major order
             String s= scan.next();
-            Log.i("~~~name",""+s);
+            //Log.i("~~~name",""+s);
             data[el++] = Float.parseFloat(s);
         }
         if(el != rows*cols) {
@@ -258,11 +267,47 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         return res;
     }
 
+    public ArrayList<Mat> loadMat3FromFile(String name) {
+        int resID = getResources().getIdentifier(name, "raw", getPackageName());
+        InputStream is = getResources().openRawResource(resID);
+        Scanner scan = new Scanner(is).useDelimiter(",| |\\n");
+        int dims = Integer.parseInt(scan.next());
+        if(dims != 3) {
+            Log.e("~~~","Dimention mismatch");
+            return null;
+        }
+        int rows = Integer.parseInt(scan.next());
+        int cols = Integer.parseInt(scan.next());
+        int d3 = Integer.parseInt(scan.next());
+        ArrayList<Mat> layer = new ArrayList<Mat>();
+        for (int i = 0; i < d3; i++) {
+            Mat res = new Mat(rows, cols, CvType.CV_32F);
+            float data[] = new float[rows * cols];
+            for(int el = 0; el < rows*cols; el++){ //Column major order
+                if(!scan.hasNext()) {
+                    Log.e(TAG,"Size Mismatch");
+                }
+                data[el] = Float.parseFloat(scan.next());
+            }
+            res.put(0, 0, data);
+            layer.add(res);
+        }
+
+        if(scan.hasNext()) {
+            Log.e(TAG,"Size Mismatch");
+        }
+        return layer;
+    }
+
     public ArrayList<ArrayList<Mat>> loadMat4FromFile(String name) {
         int resID = getResources().getIdentifier(name, "raw", getPackageName());
         InputStream is = getResources().openRawResource(resID);
         Scanner scan = new Scanner(is).useDelimiter(",| |\\n");
-        int num_dims = 4;
+        int dims = Integer.parseInt(scan.next());
+        if(dims != 4) {
+            Log.e("~~~","Dimention mismatch");
+            return null;
+        }
         int rows = Integer.parseInt(scan.next());
         int cols = Integer.parseInt(scan.next());
         int d3 = Integer.parseInt(scan.next());
@@ -273,14 +318,19 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
             for (int i = 0; i < d3; i++) {
                 Mat res = new Mat(rows, cols, CvType.CV_32F);
                 float data[] = new float[rows * cols];
-                int el = 0;
-                while (scan.hasNext()) { //Column major order
-                    data[el++] = Float.parseFloat(scan.next());
+                for(int el = 0; el < rows*cols; el++){ //Column major order
+                    if(!scan.hasNext()) {
+                        Log.e(TAG,"Size Mismatch");
+                    }
+                    data[el] = Float.parseFloat(scan.next());
                 }
                 res.put(0, 0, data);
                 filter.add(res);
             }
             layer.add(filter);
+        }
+        if(scan.hasNext()) {
+            Log.e(TAG,"Size Mismatch");
         }
         return layer;
     }
@@ -499,7 +549,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
             Core.add(channels.get(i), distance, distance);
         }
 
-        Core.sqrt(distance,distance);
+        Core.sqrt(distance, distance);
         return distance;
         /*
         for(int r = 0; r < A.rows(); r++) {
@@ -518,6 +568,10 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         return distance;*/
     }
 
+    public void imgDist(Mat LAB,Point2 loc, Mat dest) {
+
+    }
+
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         if(!initialized) {
             init();
@@ -525,7 +579,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Mat rgba = inputFrame.rgba();
         Core.flip(rgba, rgba, 0);
         Size sizeRgba = rgba.size();
-        int width = 38;
+        int width = 42;
         int thumbSize = width*4;
 
         Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
@@ -539,31 +593,22 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Core.merge(ch,mIntermediateMat);
         Mat dist_ab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
         Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, feedbackMat);
-        feedbackMat.copyTo(input);
+        //feedbackMat.copyTo(input);
         feedbackMat.convertTo(feedbackMat, CvType.CV_8U);
         Imgproc.cvtColor(feedbackMat, feedbackMat, Imgproc.COLOR_GRAY2RGBA);
         Imgproc.resize(feedbackMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
 
-
-        /*ArrayList<Mat> in = new ArrayList<Mat>();
-        Core.flip(input, input, 1);
-        in.add(input);
-        in = net.evaluate(in);
-        Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
-        Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
-        ArrayList<Mat> ch = new ArrayList<Mat>();
-        Core.flip(mIntermediateMat,mIntermediateMat,1);
-        Imgproc.resize(mIntermediateMat, mIntermediateMat2, new Size(thumbSize, thumbSize));
-        mIntermediateMat2.convertTo(thumb,CvType.CV_8U);
-        Core.split(mIntermediateMat, ch);
-        ch.remove(3);*/
-
         ArrayList<Mat> in = new ArrayList<Mat>();
-        Core.flip(input,input,1);
-        in.add(input);
-        in = net.evaluate(in);
-        //Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
-        int max_pos = 0;
+        //Core.flip(input,input,1);
+        //in.add(input);
+
+        /*Log.i(TAG,MatToString(input.get(0)));
+        Log.i(TAG,MatToString(input.get(1)));
+        Log.i(TAG,MatToString(input.get(2)));*/
+        in = net.evaluate(input);
+        Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
+
+        /*int max_pos = 0;
         double exp_sum = 0;
         for(int i = 0; i < in.size(); i++) {
             exp_sum += Math.exp(in.get(i).get(0, 0)[0]);
@@ -578,7 +623,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
 
         double res[] = buffer_average();
         String s = String.format("%.3f, %.3f, %.3f, %.3f", res[0], res[1], res[2], res[3]);
-        Core.putText(rgba,s,new Point(thumbSize,thumbSize+20),0,1,new Scalar(255,0,0,0),5);
+        Core.putText(rgba, s, new Point(thumbSize, thumbSize + 20), 0, 1, new Scalar(255, 0, 0, 0), 5);
         int new_label = buffer_label();
         if(new_label != current_state && new_label >= 0) {
             playFile(label_sound_files[new_label]);
@@ -611,48 +656,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
             mat2csvFile(ch.get(1), file);
             file = new File(Environment.getExternalStorageDirectory(), "data/BBB.data");
             mat2csvFile(ch.get(2), file);
-        }
-        /*int off = 2;
-        int stride = 4;
-        Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
-        int pad = 2;
-
-        double min = Core.minMaxLoc(in.get(0)).minVal;
-        Mat temp = Mat.ones(in.get(0).rows() + 2 * pad, in.get(0).cols() + 2 * pad, in.get(0).type());
-        Core.multiply(temp,new Scalar(min),temp);
-        in.get(0).copyTo(temp.submat(pad, temp.rows() - pad, pad, temp.cols() - pad));
-        Log.i(TAG, "" + MatToString(temp));
-        Imgproc.dilate(temp, temp, kernel);
-        Log.i(TAG, "" + MatToString(temp));
-        temp = temp.submat(off,temp.rows()-off,off,temp.cols()-off);
-        Log.i(TAG, "" + temp);
-        int size = (int)Math.ceil(1.0*temp.rows()/stride);
-        Imgproc.resize(temp,in.get(0),new Size(size,size),0,0,Imgproc.INTER_NEAREST);*/
-
-                //mIntermediateMat = mIntermediateMat.submat(5,mIntermediateMat.rows()-5,5,mIntermediateMat.cols()-5);
-        //Log.i(TAG,MatToString(mIntermediateMat));
-
-
-        /*Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
-        Mat filter = new Mat(new Size(11,11),CvType.CV_32F);
-        Mat filter2 = Mat.ones(new Size(3,3),CvType.CV_8U);
-        Mat dump = new Mat();
-        Core.randu(filter, 0, 10);
-        for (int i = 0; i < 150; i++) {
-            Imgproc.filter2D(mIntermediateMat,dump,-1,filter);
-        }
-        Mat test = new Mat(new Size(10,10),CvType.CV_8U);
-        Core.randu(test, 0, 100);
-        Log.i(TAG, MatToString(test));
-        Imgproc.dilate(test, test, filter2, new Point(1, 1), 1);
-        test = test.submat(1,test.rows()-1,1,test.cols()-1);
-        Log.i(TAG, MatToString(test));
-        Imgproc.resize(test,test,new Size(0,0),0.25,0.25,Imgproc.INTER_NEAREST);
-        //Imgproc.resize(test,test,new Size(3,3),0,0,Imgproc.INTER_MAX);
-        Log.i(TAG,MatToString(test));*/
-        //Mat test = loadMatFromFile("layer1s1s1",11,11);
-        //Log.i(TAG,MatToString(test));
-
+        }*/
 
         Core.flip(rgba, rgba, -1);
         return rgba;

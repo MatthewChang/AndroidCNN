@@ -1,1 +1,10 @@
-140.05
+mean mean
+conv layer1 layer1b
+relu
+pool layer3
+conv layer4 layer4b
+relu
+pool layer6
+conv layer7 layer7b
+relu
+conv layer9 layer9b
