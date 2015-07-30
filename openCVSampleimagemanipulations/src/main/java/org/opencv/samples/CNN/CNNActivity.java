@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -508,8 +509,6 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
 
     public Mat distanceFrom(Mat A, Point2 kernel) {
         Mat distance = Mat.zeros(A.rows(), A.cols(), CvType.CV_32F);
-        /*short distance_data[] = new short[A.rows() * A.cols()];
-        distance.get(0, 0, distance_data);*/
 
         A.convertTo(A, CvType.CV_32F);
         int step1 = A.channels();
@@ -517,30 +516,11 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         float data[] = new float[A.rows() * A.cols() * A.channels()];
 
         A.get(0, 0, data);
-        //Log.i(TAG,""+A.depth()+" "+A.step1());
         int mean[] = new int[A.channels()];
-        /*int cand[][] = {{-2, 0},
-                {-1, 1},
-                {0, 2},
-                {1, 1},
-                {2, 0},
-                {1, -1},
-                {0, -2},
-                {-1, -1},
-
-                {-1, 0},
-                {1, 0},
-                {0, -1},
-                {0, 1},
-                {0, 0}};*/
-        int cand[][] = {{0, 0}};
-
         for (int l = 0; l < A.channels(); l++) {
-            for (int i = 0; i < cand.length; i++) {
-                mean[l] += data[(kernel.x + cand[i][0]) * step2 + (kernel.y + cand[i][1]) * step1 + l];
-            }
-            mean[l] /= cand.length;
+            mean[l] = (int)data[kernel.x*step2 + kernel.y*step1 + l];
         }
+
         List<Mat> channels = new ArrayList<Mat>();
         Core.split(A, channels);
         for (int i = 0; i < A.channels(); i++){
@@ -551,25 +531,16 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
 
         Core.sqrt(distance, distance);
         return distance;
-        /*
-        for(int r = 0; r < A.rows(); r++) {
-            for(int c = 0; c < A.cols(); c++) {
-                int dist = 0;
-                for(int l = 0; l < A.channels(); l++) {
-                    int v = data[r*step2 + c*step1 + l] - mean[l];
-                    dist += v*v;
-                }
-                dist = (int)Math.sqrt(dist);
-                distance_data[r * A.cols() + c] = (short)dist;
-            }
-        }
-        distance.put(0,0,distance_data);
-
-        return distance;*/
     }
 
     public void imgDist(Mat LAB,Point2 loc, Mat dest) {
-
+        Mat dist_lab = distanceFrom(LAB,loc);
+        ArrayList<Mat> ch = new ArrayList<Mat>();
+        Core.split(LAB, ch);
+        ch.remove(0);
+        Core.merge(ch, dest);
+        Mat dist_ab = distanceFrom(dest,loc);
+        Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, dest);
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
@@ -585,30 +556,33 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
         Imgproc.resize(rgba, mIntermediateMat, new Size(width, width));
         Mat thumb = rgba.submat(0, thumbSize, 0, thumbSize);
         Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2Lab);
-        Mat dist_lab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
-
-        ArrayList<Mat> ch = new ArrayList<Mat>();
-        Core.split(mIntermediateMat,ch);
-        ch.remove(0);
-        Core.merge(ch,mIntermediateMat);
-        Mat dist_ab = distanceFrom(mIntermediateMat,new Point2(width/2-1,width/2-1));
-        Core.addWeighted(dist_lab, 1, dist_ab, 5, 0, feedbackMat);
-        //feedbackMat.copyTo(input);
-        feedbackMat.convertTo(feedbackMat, CvType.CV_8U);
-        Imgproc.cvtColor(feedbackMat, feedbackMat, Imgproc.COLOR_GRAY2RGBA);
-        Imgproc.resize(feedbackMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
-
+        Core.flip(mIntermediateMat, mIntermediateMat, 1);
         ArrayList<Mat> in = new ArrayList<Mat>();
-        //Core.flip(input,input,1);
-        //in.add(input);
+        in.add(new Mat());
+        in.add(new Mat());
+        in.add(new Mat());
+        Point2 loc = new Point2(0,0);
+        Random rnd = new Random();
+        loc.x = rnd.nextInt(width);
+        loc.y = rnd.nextInt(width);
+        imgDist(mIntermediateMat, loc, in.get(0));
+        loc.x = rnd.nextInt(width);
+        loc.y = rnd.nextInt(width);
+        imgDist(mIntermediateMat, loc, in.get(1));
+        loc.x = rnd.nextInt(width);
+        loc.y = rnd.nextInt(width);
+        imgDist(mIntermediateMat, loc ,in.get(2));
+        Core.merge(in, mIntermediateMat);
 
-        /*Log.i(TAG,MatToString(input.get(0)));
-        Log.i(TAG,MatToString(input.get(1)));
-        Log.i(TAG,MatToString(input.get(2)));*/
-        in = net.evaluate(input);
-        Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);
+        mIntermediateMat.convertTo(mIntermediateMat,CvType.CV_8U);
+        Imgproc.cvtColor(mIntermediateMat, mIntermediateMat, Imgproc.COLOR_RGB2RGBA);
+        Imgproc.resize(mIntermediateMat, thumb, new Size(thumbSize, thumbSize), 0, 0, Imgproc.INTER_NEAREST);
 
-        /*int max_pos = 0;
+
+        in = net.evaluate(in);
+        /*Log.i(TAG, "" + in.get(0).get(0, 0)[0] + " " + in.get(1).get(0, 0)[0] + " " + in.get(2).get(0, 0)[0] + " " + in.get(3).get(0, 0)[0]);*/
+
+        int max_pos = 0;
         double exp_sum = 0;
         for(int i = 0; i < in.size(); i++) {
             exp_sum += Math.exp(in.get(i).get(0, 0)[0]);
@@ -647,7 +621,7 @@ public class CNNActivity extends Activity implements CvCameraViewListener2, View
                 break;
 
         }
-        if(toggle) {
+        /*if(toggle) {
             toggle = !toggle;
             Log.i("~~","WRITING");
             File file = new File(Environment.getExternalStorageDirectory(), "data/RRR.data");
